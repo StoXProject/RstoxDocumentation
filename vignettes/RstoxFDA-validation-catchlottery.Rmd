@@ -1,6 +1,7 @@
 ---
 title: "Validation of catch lottery estimation with RstoxFDA"
 output: rmarkdown::html_vignette
+author: Edvin Fuglebakk
 vignette: >
   %\VignetteIndexEntry{Validation of catch lottery estimation with RstoxFDA}
   %\VignetteEngine{knitr::rmarkdown}
@@ -16,6 +17,8 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(RstoxDocumentation)
+library(survey)
+iterations <- 1000 # the number of iterations to run for simulations
 ```
 
 # Catch lottery estimation with RstoxFDA
@@ -28,9 +31,8 @@ Validation will be based on example data bundled with the RstoxFDA package. This
 * RstoxFDA::CatchLotteryLandingExample: NSH landings from Norwegian vessels larger than 15 m in 2022.
 
 ## Workflows
-We will test the correctness of two workflows: A design based estimate of abundance, mean length and mean weight in age-groups, and a ratio estimate of the same. The workflows will be defined by the following functions:
+I will test the correctness of a workflow implementing a design based estimate of abundance, mean length and mean weight in age-groups, using RstoxFDA. The workflow implements analaysis for a simple desgin, with only one strata and no PSU-domains. The workflow is defined below:
 
-Design based:
 ```{r design-based-estimate}
 designBased <- function(records, sampling, MeanOfMeans=F){
   #Define sampling parameters within haul for individual fish
@@ -88,15 +90,9 @@ designBased <- function(records, sampling, MeanOfMeans=F){
 }
 ```
 
-Ratio estimate:
-```{r ratio-estimate}
-ratioEstimate <- function(records, sampling, landings){
-  
-}
-```
-
-
 ## Comparison with other estimators
+Lumleys survey-package provides analytical design based estimators for unequal probability sampling. It does not provide the Hansen-Hurwtiz variance estimator implemented in RstoxFDA, but allows the same kind of sampling weights (based on selection probabilities), and variance estimates are expected to be similar. I implement an estimator for the desing below:
+
 ```{r designBasedLumley}
 #HT estimate with the survey package
 designBasedLumley <- function(records, sampling){
@@ -123,25 +119,29 @@ designBasedLumley <- function(records, sampling){
 
 ```
 
+Comparing the estimators for the example data shows total agreement for mean estimates, and similar magnitudes for error estimates:
 
-```{r}
+```{r compWithLumley}
 sampling <- RstoxFDA::CatchLotterySamplingExample
 sampling$SelectionTable <- sampling$SelectionTable[!is.na(sampling$SelectionTable$SelectionProbability),]
 resRstoxFDA <- designBased(RstoxFDA::CatchLotteryExample, sampling)
 resLumley <- designBasedLumley(RstoxFDA::CatchLotteryExample, sampling)
 
 comp <- merge(resRstoxFDA[,.SD, .SDcol=c("Age", "IndividualRoundWeight", "IndividualTotalLength", "se.IndividualRoundWeight", "se.IndividualTotalLength")], resLumley, by="Age", suffixes = c("-RstoxFDA", "-Lumley"))
-comp <- comp[,.SD,.SDcols = c("Age", sort(names(comp)[names(comp)!="Age"]))]
+comp <- comp[,.SD,.SDcols = c("Age", "IndividualRoundWeight-Lumley", "IndividualRoundWeight-RstoxFDA", "se.IndividualRoundWeight-Lumley", "se.IndividualRoundWeight-RstoxFDA")]
+
+stopifnot(all(abs(comp$`IndividualRoundWeight-Lumley`-comp$`IndividualRoundWeight-RstoxFDA`)<1e-6))
+
 comp
 ```
 
 ## Simulation
 
-We will corroborate that the estimators have expected properties by a simulation study. We will construct a pseud-population from the example data-set, so that population means and totals are known, and simulate sampling and estimation to investigate bias.
+I will corroborate that the estimators have expected properties by a simulation study. I will construct a pseudo-population from the example data-set, so that population means and totals are known, and simulate sampling and estimation to investigate bias.
 
 ### Pseudo-population
 
-We will define a pseudo-population that is simply a replication of the example data set, including only fish with observed Age, length and weight, and including only sampled hauls. We will represent this with the original data set, and and ordered list of replicated haul-ids (serialnumbers) and for each of them an ordered list of replicated fish-ids.
+I will define a pseudo-population that is simply a replication of the example data set, including only fish with observed Age, length and weight, and including only sampled hauls. I will represent this with the original data set, and and ordered list of replicated haul-ids (serialnumbers) and for each of them an ordered list of replicated fish-ids.
 
 ```{r pseudopop}
 #Define pseudopopulation
@@ -160,17 +160,33 @@ for (s in serialnumbers){
   fish[[s]] <- rep(individuals, fr)
 }
 
+```
+
+I define a function to compute population statitstics to compare with estimators. I include an option to make a total estimate (no age domains). For simplicity this is implemented as forcing all age groups to the age group "1":
+
+```{r poplationStats}
+
 #calculate population stats
-populationStats <- indtable[,list(Abundance=sum(fishreplications*haulreplications), 
+getPopStats <- function(domain=T){
+  tab <- indtable
+  if (!domain){
+    tab$IndividualAge <- 1
+  }
+populationStats <- tab[,list(Abundance=sum(fishreplications*haulreplications), 
                                   Weight=sum(IndividualRoundWeight*fishreplications*haulreplications),
                                   Length=sum(IndividualTotalLength*fishreplications*haulreplications)), by="IndividualAge"]
 populationStats$MeanWeight <- populationStats$Weight / populationStats$Abundance
 populationStats$MeanLength <- populationStats$Length / populationStats$Abundance
 populationStats <- populationStats[order(populationStats$IndividualAge),]
-populationStats$Age <- as.character(populationStats$IndividualAge)
+populationStats$Age <- as.character(populationStats$IndividualAge)  
+
+return(populationStats)
+}
+
 ```
 
-We will assign a fixed set of sampling probabilites that will be used for all simulations:
+
+I will assign a fixed set of sampling probabilites that will be used for all simulations:
 
 ```{r selectionProbabilities}
 SelectionProbabilities <- RstoxFDA::CatchLotterySamplingExample$SelectionTable$SelectionProbability[
@@ -178,7 +194,9 @@ SelectionProbabilities <- RstoxFDA::CatchLotterySamplingExample$SelectionTable$S
 SelectionProbabilities <- SelectionProbabilities/sum(SelectionProbabilities)
 ```
 
-We will then define a function that performs Poisson sampling from this population, mimicking the catch lottery. The function will construct the data sets necessary for estimation:
+### Virtual sampling
+
+I will then define a function that performs Poisson sampling from this population, mimicking the catch lottery. The function will construct the data sets necessary for estimation:
 
 ```{r sampling}
 
@@ -262,64 +280,122 @@ samplePseudoPop <- function(expSampleSize=80){
 }
 ```
 
-We then have a known population, and a controlled selection from that population. So we can calculate known errors and compare to estimated errors. E.g.
+I then have a known population, and a controlled selection from that population. So I can calculate known errors and compare to estimated errors. E.g.
 
 ```{r simulationExample}
 sample <- samplePseudoPop()
 estimate <- designBased(sample$dataRecords, sample$samplingParameters)
-comp <- merge(estimate, populationStats, by="Age", suffix=c(".estimate", ".pop"))
+comp <- merge(estimate, getPopStats(), by="Age", suffix=c(".estimate", ".pop"))
 comp$abundance.error <- comp$Abundance.estimate - comp$Abundance.pop
 comp$MeanWeight.error <- comp$IndividualRoundWeight - comp$MeanWeight
 comp$se.Abundance
 comp$se.IndividualRoundWeight
 comp[,c("Age", "abundance.error", "se.Abundance", "MeanWeight.error", "se.IndividualRoundWeight")]
 ```
-For unbiased estimation of parameters and their variance, we would expect:
-* The mean error over simulations to be zero. That is bias is 0.
-* The mean se over simulations to be equal to the mean absolute error over simulations. That is biasSE is zero.
+For unbiased estimation of parameters and their variance, I would expect:
+* The mean error over simulations to be zero. That is bias is 0. I will compute the relative bias: mean(estimate-truth)/truth
+* The mean se over simulations to be equal to the mean absolute error over simulations. That is biasSE is zero. I will compute the relative biasSE (mean(se) - mean(abs(estimate-truth))) / truth.
 
-We set up the simulation and calculate cumulative bias and biasSE, so that we can monitor convergence of the statistics.
+Note that the mean true error is not known in the same way that the error of individual estimates are known. Rather it is estimated over simulations, and compared to the average estimate of SE. the relative biasSE is not relative to the true error, but to the total true value.
+
+### Estimation statistics
+
+I set up the simulation and calculate cumulative bias and biasSE, so that I can monitor convergence of the statistics. I make the domain estimate by age optional, forcing everythin to be age 1, when the domain estimate is not desired:
 
 ```{r simulate}
-simulate <- function(iterations=1000, n=80){
+simulate <- function(iterations=1000, n=80, domain=T){
   
   simStats <- NULL
+  populationStats <- getPopStats(domain)
   
   for (i in 1:iterations){
     sample <- samplePseudoPop(n)
+    if (!domain){
+      sample$dataRecords$Individual$IndividualAge=1
+    }
     estimate <- designBased(sample$dataRecords, sample$samplingParameters)
     comp <- merge(estimate, populationStats, by="Age", suffix=c(".estimate", ".pop"))
     abundanceStats <- comp[,list(iteration=i, Param="Abundance", truth=Abundance.pop, estimate=Abundance.estimate, se=se.Abundance), by="Age"]
+    totalWeightStats <- comp[,list(iteration=i, Param="TotalWeight", truth=Weight, estimate=TotalRoundWeight, se=se.TotalRoundWeight), by="Age"]
     meanWeightStats <- comp[,list(iteration=i, Param="MeanWeight", truth=MeanWeight, estimate=IndividualRoundWeight, se=se.IndividualRoundWeight), by="Age"]
     
     simStats <- rbind(simStats, abundanceStats)
     simStats <- rbind(simStats, meanWeightStats)
+    simStats <- rbind(simStats, totalWeightStats)
   }
   
   simStats <- simStats[order(simStats$iteration),]
   
-  simSummary <- simStats[,list(iteration=iteration, error=estimate-truth, SE=se, bias=cumsum(estimate-truth)/iteration, relativeBias=(cumsum(estimate-truth)/iteration)/unique(truth), biasSE=cumsum(se)/iteration - cumsum(estimate-truth)/iteration, relativeBiasSE=(cumsum(se)/iteration - cumsum(abs(estimate-truth))/iteration) / (cumsum(abs(estimate-truth))/iteration)), by=c("Param", "Age")]
+  simSummary <- simStats[,list(iteration=iteration, error=estimate-truth, SE=se, bias=cumsum(estimate-truth)/iteration, relativeBias=(cumsum(estimate-truth)/iteration)/unique(truth), biasSE=cumsum(se)/iteration - cumsum(estimate-truth)/iteration, relativeBiasSE=(cumsum(se)/iteration - cumsum(abs(estimate-truth))/iteration) / unique(truth)), by=c("Param", "Age")]
   
   return(simSummary)
 }
-iterations <- 1000
+
+```
+
+I simulate estimation of totals, without age domains. The estimators should theoretically be unbiased for this estimation:
+
+```{r simNoDomains}
 timestampStart <- Sys.time()
-simStats <- simulate(iterations)
+simStatsNoDomains <- simulate(iterations, domain=F)
 timestampEnd <- Sys.time()
 difftime(timestampEnd, timestampStart)
 ```
 
-```{r}
-minX<-floor(iterations/3)
-ggplot2::ggplot(simStats[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias abundance")
-ggplot2::ggplot(simStats[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias mean weight")
-ggplot2::ggplot(simStats[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE abundance")
-ggplot2::ggplot(simStats[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE mean weight")
+I also simulate estimation of totals within domains. These are ratio estimators, and some bias is to be expected:
+
+```{r simDomains}
+timestampStart <- Sys.time()
+simStatsAgeDomains <- simulate(iterations, domain=T)
+timestampEnd <- Sys.time()
+difftime(timestampEnd, timestampStart)
 ```
 
+### Results unbiased estimators
 
+For the simulation of the unbiased estimators, the simulation confirms the theoretical expectation, corroborating that the implementation is correct. For point estimates (Less than 0.1 % relative bias):
 
-## Notes
-* Implement simulation for MeanOfMeans and !MeanOfMeans
-* May drop the comparison with Lumley when simulation is implemented. Or change it to a HH weighting and compare only means.
-* write tutorial on MeanOfMeans vs !MeanOfMeans. Contrast mean weight in age group with something with uglier distribution of means e.g. mean abundance in age group. Perhaps put in RstoxFDA.
+```{r resultNoDomainsPointEstimates}
+minX<-floor(iterations/3)
+ggplot2::ggplot(simStatsNoDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias abundance")
+ggplot2::ggplot(simStatsNoDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias mean weight")
+ggplot2::ggplot(simStatsNoDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias total weight")
+stopifnot(all(abs(simStatsNoDomains$relativeBias[simStatsNoDomains$iteration==max(simStatsNoDomains$iteration)])<1e-3))
+```
+
+and for error estimates (less than 0.1 % relative bias):
+
+```{r resultsNoDomainsError Estimates}
+ggplot2::ggplot(simStatsNoDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE abundance")
+ggplot2::ggplot(simStatsNoDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE mean weight")
+ggplot2::ggplot(simStatsNoDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE total weight")
+stopifnot(all(abs(simStatsNoDomains$relativeBiasSE[simStatsNoDomains$iteration==max(simStatsNoDomains$iteration)])<1e-3))
+```
+
+### Results ratio estimators
+
+As expected, the ratio estimators for domains exhibit a small bias. For point estimates, these are less than 5% for this example:
+
+```{r resultsDomainsPointEstimates}
+minX<-floor(iterations/3)
+ggplot2::ggplot(simStatsAgeDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias abundance")
+ggplot2::ggplot(simStatsAgeDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias mean weight")
+ggplot2::ggplot(simStatsAgeDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias total weight")
+stopifnot(all(abs(simStatsAgeDomains$relativeBias[simStatsAgeDomains$iteration==max(simStatsAgeDomains$iteration)])<.05))
+```
+For the error estimates, it is a bit higher, with worst case performance less 15% for this example:
+
+```{r resultsDomainsErrorEstimates}
+ggplot2::ggplot(simStatsAgeDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE abundance")
+ggplot2::ggplot(simStatsAgeDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE mean weight")
+ggplot2::ggplot(simStatsAgeDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE total weight")
+stopifnot(all(abs(simStatsAgeDomains$relativeBiasSE[simStatsAgeDomains$iteration==max(simStatsAgeDomains$iteration)])<.15))
+```
+The performance of the estimator for domains is expected to be better for high abundance domains:
+
+```{r biasVsAbdunance}
+finalStats <- simStatsAgeDomains[simStatsAgeDomains$iteration==max(simStatsAgeDomains$iteration)]
+finalStats <- merge(finalStats, getPopStats(T), by="Age")
+ggplot2::ggplot(finalStats) + ggplot2::geom_point(ggplot2::aes(x=Abundance, y=relativeBias, col=Param)) + ggplot2::ggtitle("relative bias point estimates")
+ggplot2::ggplot(finalStats) + ggplot2::geom_point(ggplot2::aes(x=Abundance, y=relativeBiasSE, col=Param)) + ggplot2::ggtitle("relative bias error estimates")
+```
