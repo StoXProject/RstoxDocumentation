@@ -1,0 +1,105 @@
+---
+title: "Analysis of Sample Size Sensitivity"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Analysis of Sample Size Sensitivity}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(RstoxDocumentation)
+```
+
+I first defined a function that manipulates output from a stox process, in order to mimic reduction in samples. For this example, the easiest way is to manipulate the output of the assignment of PSUs to data, so this function accepts and returns data of type PSUSamplingParametersData. For other kinds of estimation, selection is not treated seperately from recording of data, and the most natural way to implement data reduction would be something similar that accepts and returns StoxBioticData. The following funtionc reduces the sample size by 'n', and keeps data with probability proportional to the selection probabilities.
+
+```{r}
+reductionBySelectionProb <- function(PSUSamplingParametersData, n){
+  
+  N <- nrow(PSUSamplingParametersData$SelectionTable)
+  stopifnot(n<N)
+  keep <- N-n
+  
+  selection <- PSUSamplingParametersData
+  selection$SelectionTable <- selection$SelectionTable[sample.int(nrow(PSUSamplingParametersData$SelectionTable), keep, prob = PSUSamplingParametersData$SelectionTable$SelectionProbability),]
+  selection$SampleTable$n <- keep
+
+  return(selection)  
+}
+```
+
+
+```{r}
+report <- function(projectResult){
+  return(projectResult[["ReportCaa"]]$NbyAge)
+}
+```
+
+
+I then implement a function that runs a project, halts at an appropriate process, executes the data reduction, and continues execution of the StoX project with the data replaced:
+
+
+
+```{r}
+#' Executes stox project with inserted data manipulation routing
+#' @param project
+#' @param dataProcess Name of process in baseline, whose data output should be manipulated by 'reductionFunction'
+#' @param n argument to reductionFunction, the number of samples to remove
+#' @param reductionFunction function that accepts and returns the output from dataProcess, and, and the argument n 
+#' @param reportFunction function that accepts what is returned from RstoxFramework::runProject, and extracts desired results
+#' @return the data returned from 'resultProcess'
+runWithReducedData <- function(project, dataProcess, n, reductionFunction=reductionBySelectionProb, reportFunction=report){
+  p <- RstoxFramework::runProject(project, modelNames="baseline", endProcess = dataProcess)
+  data <- p[[dataProcess]]
+  reducedData <- reductionFunction(data, n)
+  
+  replaceDataList <- list()
+  replaceDataList[[dataProcess]] <- reducedData
+
+  
+  result <- RstoxFramework::runProject(project, startProcess = dataProcess, replaceDataList = replaceDataList)
+  return(reportFunction(result))
+}
+```
+
+Below is an example, comparing the run with the original data with a random reduction of 10 PSUs (hauls):
+
+```{r}
+exampleProject <- "~/stoxprosjekter/analyticalCAA/"
+regularResult <- runWithReducedData(exampleProject, "AssignPSUSamplingParameters", 0, function(x,y){x})
+reducedResult <- runWithReducedData(exampleProject, "AssignPSUSamplingParameters", 10)
+comparison <- merge(regularResult, reducedResult, by=c("AgeGroup", "Age"), suffix=c(".regular", ".reduced"))
+comparison
+```
+
+```{r, message=FALSE}
+sampleSensitivity <- function(project, dataProcess="AssignPSUSamplingParameters", maxRemove=50, replications=3){
+  
+  result <- NULL
+  
+  computations <- maxRemove*replications
+  for (i in 1:maxRemove){
+    for (j in 1:replications){
+      reducedResult <- runWithReducedData(project, dataProcess, i)
+      reducedResult$sampleReduction <- i
+      reducedResult$replicate <- j
+      
+      result <- rbind(result, reducedResult)
+    }
+  }
+  return(result)
+}
+res<-sampleSensitivity(exampleProject, maxRemove=40, replications = 1)
+```
+
+```{r}
+ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5))
+```
+
