@@ -67,11 +67,15 @@ reductionBySelectionProb <- function(PSUSamplingParametersData, n){
 }
 ```
 
-Finally, the following function extract the results we are interested in from a modified StoX-process run:
+Finally, the following function extract the results we are interested in from a modified StoX-process run. For this example we will only focus on the age groups 2 and 3, for illustration purposes only:
 
 ```{r}
 report <- function(projectResult){
-  return(projectResult[["ReportCaa"]]$NbyAge)
+  sampleSize <- projectResult[["AssignPSUSamplingParameters"]]
+  result <- projectResult[["ReportCaa"]]$NbyAge
+  result <- result[Age==2 | Age==3,]
+  result$n <- sampleSize$SampleTable$n
+  return(result)
 }
 ```
 
@@ -113,6 +117,6 @@ res<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject)))
 Assuming that the abundance of age group is of interest, plotting the CV of catch at age estimates does provide any clear indication of oversampling:
 
 ```{r}
-ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5))
+ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=n, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5))
 ```
 
