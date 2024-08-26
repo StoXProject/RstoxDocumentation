@@ -285,9 +285,9 @@ comp$se.Abundance
 comp$se.IndividualRoundWeight
 comp[,c("Age", "abundance.error", "se.Abundance", "MeanWeight.error", "se.IndividualRoundWeight")]
 ```
-For unbiased estimation of parameters and their variance, I would expect:
+For unbiased estimation of parameters and their variance over the entire sampled strata, we have a theoretically unbiased estimator of parameters, and an approximation to the variance that assumes sampling with replacement and is therefore expected to overestimate the sampling error. I would expect:
 * The mean error over simulations to be zero. That is bias is 0. I will compute the relative bias: mean(estimate-truth)/truth
-* The mean se over simulations to be equal to the mean absolute error over simulations. That is biasSE is zero. I will compute the relative biasSE (mean(se) - mean(abs(estimate-truth))) / truth.
+* The mean se over simulations to be a slight overestimate of the mean absolute error over simulations. That is biasSE is zero. I will compute the relative biasSE (mean(se) - mean(abs(estimate-truth))) / truth.
 
 Note that the mean true error is not known in the same way that the error of individual estimates are known. Rather it is estimated over simulations, and compared to the average estimate of SE. the relative biasSE is not relative to the true error, but to the total true value.
 
@@ -356,7 +356,7 @@ ggplot2::ggplot(simStatsNoDomains[Param=="TotalWeight" & iteration>minX,]) + ggp
 #stopifnot(all(abs(simStatsNoDomains$relativeBias[simStatsNoDomains$iteration==max(simStatsNoDomains$iteration)])<1e-2))
 ```
 
-and for error estimates (less than 2 % relative bias):
+and for error estimates (less than 2 % relative bias, skewing positive):
 
 ```{r resultsNoDomainsError Estimates}
 ggplot2::ggplot(simStatsNoDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE abundance")
