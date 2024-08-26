@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(RstoxDocumentation)
 library(survey)
-iterations <- 1000 # the number of iterations to run for simulations
+iterations <- 10000 # the number of iterations to run for simulations
 ```
 
 # Catch lottery estimation with RstoxFDA
@@ -350,18 +350,18 @@ For the simulation of the unbiased estimators, the simulation confirms the theor
 
 ```{r resultNoDomainsPointEstimates}
 minX<-floor(iterations/3)
-ggplot2::ggplot(simStatsNoDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias abundance")
-ggplot2::ggplot(simStatsNoDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias mean weight")
-ggplot2::ggplot(simStatsNoDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias, col=Age)) + ggplot2::ggtitle("Relative bias total weight")
+ggplot2::ggplot(simStatsNoDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias)) + ggplot2::ggtitle("Relative bias abundance")
+ggplot2::ggplot(simStatsNoDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias)) + ggplot2::ggtitle("Relative bias mean weight")
+ggplot2::ggplot(simStatsNoDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBias)) + ggplot2::ggtitle("Relative bias total weight")
 #stopifnot(all(abs(simStatsNoDomains$relativeBias[simStatsNoDomains$iteration==max(simStatsNoDomains$iteration)])<1e-2))
 ```
 
 and for error estimates (less than 2 % relative bias, skewing positive):
 
 ```{r resultsNoDomainsError Estimates}
-ggplot2::ggplot(simStatsNoDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE abundance")
-ggplot2::ggplot(simStatsNoDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE mean weight")
-ggplot2::ggplot(simStatsNoDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE total weight")
+ggplot2::ggplot(simStatsNoDomains[Param=="Abundance" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE)) + ggplot2::ggtitle("Relative bias SE abundance")
+ggplot2::ggplot(simStatsNoDomains[Param=="MeanWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE)) + ggplot2::ggtitle("Relative bias SE mean weight")
+ggplot2::ggplot(simStatsNoDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE)) + ggplot2::ggtitle("Relative bias SE total weight")
 #stopifnot(all(abs(simStatsNoDomains$relativeBiasSE[simStatsNoDomains$iteration==max(simStatsNoDomains$iteration)])<2e-2))
 ```
 
