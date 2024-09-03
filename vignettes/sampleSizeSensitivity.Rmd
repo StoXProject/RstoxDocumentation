@@ -74,7 +74,7 @@ report <- function(projectResult){
   sampleSize <- projectResult[["AssignPSUSamplingParameters"]]
   result <- projectResult[["ReportCaa"]]$NbyAge
   result <- result[Age==2 | Age==3,]
-  result$n <- sampleSize$SampleTable$n
+  result$nPSU <- sampleSize$SampleTable$n
   return(result)
 }
 ```
@@ -95,14 +95,14 @@ Check for warnings and messages in the output above, as these will be turned off
 I then define a function that runs this project repeatedly, with varying number of removed samples. It also adds some information to the reported output (number of removed samples, and and identifier for each replicate):
 
 ```{r sensitivity, message=FALSE}
-sampleSensitivity <- function(project, dataProcess="AssignPSUSamplingParameters", maxRemove=40, replications=1){
+sampleSensitivity <- function(project, dataProcess="AssignPSUSamplingParameters", maxRemove=30, replications=3, reductionFun=reductionBySelectionProb, reportFun=report){
   
   result <- NULL
   
   computations <- maxRemove*replications
   for (i in 1:maxRemove){
     for (j in 1:replications){
-      reducedResult <- runWithReducedData(project, dataProcess, i)
+      reducedResult <- runWithReducedData(project, dataProcess, i, reductionFunction = reductionFun, reportFunction = reportFun)
       reducedResult$sampleReduction <- i
       reducedResult$replicate <- j
       
@@ -114,9 +114,45 @@ sampleSensitivity <- function(project, dataProcess="AssignPSUSamplingParameters"
 res<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject)))
 ```
 
-Assuming that the abundance of age group is of interest, plotting the CV of catch at age estimates does provide any clear indication of oversampling:
+Assuming that the abundance of age group is of interest, plotting the CV of catch at age estimates does not provide any clear indication of oversampling:
 
 ```{r}
-ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=n, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5))
+ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5)) + ggplot2::ggtitle("Reducing hauls")
 ```
 
+### Lower level sampling
+
+It may also be of interest to investigate the consequence of a reduction in sampling intensity at each primary sampling unit. For this sampling program, we could for instance investigate the consequence of reducing the number of fish sampled for age in each haul. We can achieve this by running the same analysis with different functions for mimicking the reduction in sampling and for reporting. In stead of manipulating the StoX project after the assignment of PSUs, we will manipulate it after the filtering of sample records, so we define a function that accepts and returns StoxBiotic-data. The current approach typically samples up to 50 fish for age, sometimes more. We will standardize this and in the resampling we will reduce so that we retain up to 50-n fish:
+
+```{r fishReductionFunction}
+fishReductionEqualProbability <- function(StoxBioticData, n){
+  agedIndividuals <- StoxBioticData$Individual[,list(Aged=sum(!is.na(IndividualAge))), by="HaulKey"]
+  agedIndividuals$max.keep <- 50-n
+  agedIndividuals$keep <- pmin(agedIndividuals$max.keep, agedIndividuals$Aged)
+  
+  inds <- NULL
+  for (h in unique(StoxBioticData$Individual$HaulKey)){
+    sel <- StoxBioticData$Individual$HaulKey == h & !is.na(StoxBioticData$Individual$IndividualAge)
+    allInds <- StoxBioticData$Individual$Individual[sel]
+    selection <- allInds[sample.int(length(allInds), agedIndividuals$keep[agedIndividuals$HaulKey==h])]
+    inds <- rbind(inds, StoxBioticData$Individual[StoxBioticData$Individual$Individual %in% selection])
+  }
+
+  StoxBioticData$Individual <- inds
+  
+  return(StoxBioticData)
+}
+```
+
+I plug this function into the simulation, at the process "RemoveMissingCatchNumber" which is the last of the sample-filtering processes in the StoX-project, and run the simulation.
+
+```{r}
+res<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject, maxRemove = 48, replications = 1, dataProcess="RemoveMissingCatchNumber", reductionFun=fishReductionEqualProbability)))
+```
+I can plot the result the same way as for the haul-reduction analysis.
+
+```{r}
+ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,max(res$SD/res$CatchAtAge))) + ggplot2::ggtitle("Reducing fish / haul")
+```
+
+The error of the estimate is much more robust to this kind of sample reduction. The results indicate that one could reduce the number of fish sampled at each haul without risking increasing the error of these two age groups.
