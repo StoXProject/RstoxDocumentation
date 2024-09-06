@@ -111,13 +111,13 @@ sampleSensitivity <- function(project, dataProcess="AssignPSUSamplingParameters"
   }
   return(result)
 }
-res<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject)))
+resHaul<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject)))
 ```
 
 Plotting the CV of catch at age estimates does not provide any clear indication of oversampling:
 
 ```{r}
-ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5)) + ggplot2::ggtitle("Reducing hauls")
+ggplot2::ggplot(resHaul) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5)) + ggplot2::ggtitle("Reducing hauls")
 ```
 
 ### Lower level sampling
@@ -147,12 +147,18 @@ fishReductionEqualProbability <- function(StoxBioticData, n){
 I plug this function into the simulation, at the process "RemoveMissingCatchNumber" which is the last of the sample-filtering processes in the StoX-project, and run the simulation.
 
 ```{r}
-res<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject, maxRemove = 48, replications = 1, dataProcess="RemoveMissingCatchNumber", reductionFun=fishReductionEqualProbability)))
+resFish<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject, maxRemove = 48, replications = 1, dataProcess="RemoveMissingCatchNumber", reductionFun=fishReductionEqualProbability)))
 ```
 I can plot the result the same way as for the haul-reduction analysis.
 
 ```{r}
-ggplot2::ggplot(res) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,max(res$SD/res$CatchAtAge))) + ggplot2::ggtitle("Reducing fish / haul")
+ggplot2::ggplot(resFish) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,max(resFish$SD/resFish$CatchAtAge))) + ggplot2::ggtitle("Reducing fish / haul")
 ```
 
 The error of the estimate is much more robust to this kind of sample reduction. The results indicate that one could reduce the number of fish sampled at each haul without risking increasing the error of these two age groups.
+
+```{r saveResults}
+saveRDS(resFish, "samplesize_results_fish_pr_haul.rds")
+saveRDS(resHaul, "samplesize_results_haul.rds")
+```
+
