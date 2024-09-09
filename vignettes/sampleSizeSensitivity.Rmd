@@ -144,6 +144,8 @@ fishReductionEqualProbability <- function(StoxBioticData, n){
 }
 ```
 
+The function above simply manipulates the input data by remove fish records. It does not ensure consistency with records on other levels. For instance are fields like sample-weight and total sample-number left untouched. This is not of consequence for this particular analysis, as the downstream methods DefineIndividualSamplingParameters only relies on the number of specimen-records present and the CatchFractionNumber (The total number of fish in the catch).
+
 I plug this function into the simulation, at the process "RemoveMissingCatchNumber" which is the last of the sample-filtering processes in the StoX-project, and run the simulation.
 
 ```{r}
