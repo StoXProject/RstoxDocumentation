@@ -384,7 +384,7 @@ ggplot2::ggplot(simStatsAgeDomains[Param=="MeanWeight" & iteration>minX,]) + ggp
 ggplot2::ggplot(simStatsAgeDomains[Param=="TotalWeight" & iteration>minX,]) + ggplot2::geom_line(ggplot2::aes(x=iteration, y=relativeBiasSE, col=Age)) + ggplot2::ggtitle("Relative bias SE total weight")
 #stopifnot(all(abs(simStatsAgeDomains$relativeBiasSE[simStatsAgeDomains$iteration==max(simStatsAgeDomains$iteration)])<.13))
 ```
-The performance of the estimator for domains is expected to be better for high abundance domains:
+The performance of the estimator for domains is expected to be better for high abundance domains, because the bias of the domain ratio estimation is declining with sample size:
 
 ```{r biasVsAbdunance}
 finalStats <- simStatsAgeDomains[simStatsAgeDomains$iteration==max(simStatsAgeDomains$iteration)]
