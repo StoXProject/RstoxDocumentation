@@ -1,6 +1,6 @@
 {
     "project": {
-        "TimeSaved": "2024-12-23T02:46:05.597Z",
+        "TimeSaved": "2024-12-23T21:40:10.484Z",
         "RVersion": "R version 4.3.3 (2024-02-29)",
         "RstoxPackageVersion": [
             "RstoxFramework_4.1.1-9002",
@@ -80,7 +80,7 @@
             "askpass_1.2.0",
             "sys_3.4.2"
         ],
-        "Application": "StoX 4.1.0",
+        "Application": "R version 4.3.3 (2024-02-29)",
         "models": {
             "baseline": [
                 {
