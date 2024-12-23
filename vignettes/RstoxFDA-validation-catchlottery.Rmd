@@ -36,7 +36,7 @@ I will test the correctness of a workflow implementing a design based estimate o
 ```{r design-based-estimate}
 designBased <- function(records, sampling, MeanOfMeans=F){
   #Define sampling parameters within haul for individual fish
-  indParameters <- RstoxFDA::DefineIndividualSamplingParameters(StoxBioticData = records, 
+  indParameters <- RstoxFDA::ComputeIndividualSamplingParameters(StoxBioticData = records, 
                                                                 DefinitionMethod = "SRS", 
                                                                 Parameters=c("IndividualSex", "IndividualAge"))
   
@@ -415,7 +415,7 @@ ratioEst <- function(records, sampling, landings, MeanOfMeans=F){
   sampling$StratificationVariables$Species <- "061104"
 
   #Define sampling parameters within haul for individual fish
-  indParameters <- RstoxFDA::DefineIndividualSamplingParameters(StoxBioticData = records, 
+  indParameters <- RstoxFDA::ComputeIndividualSamplingParameters(StoxBioticData = records, 
                                                                 DefinitionMethod = "SRS", 
                                                                 Parameters=c("IndividualSex", "IndividualAge"))
   
