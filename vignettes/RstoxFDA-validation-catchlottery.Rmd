@@ -436,7 +436,7 @@ ratioEst <- function(records, sampling, landings, MeanOfMeans=F){
                                                              MeanOfMeans = MeanOfMeans)
   
   #Ratio estimate with total landings
-  populationEstimates <- RstoxFDA::AnalyticalRatioEstimate(populationEstimates, landings, "IndividualRoundWeight", "TotalDomainWeight")
+  populationEstimates <- RstoxFDA::AnalyticalRatioEstimate(populationEstimates, landings, "IndividualRoundWeight", "TotalDomainWeight", StratificationVariables = "Species")
   
   #reformat data
   length <- populationEstimates$Variables[Variable=="IndividualTotalLength",]
