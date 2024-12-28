@@ -1,6 +1,6 @@
 {
     "project": {
-        "TimeSaved": "2024-12-23T21:40:10.484Z",
+        "TimeSaved": "2024-12-26T23:52:53.814Z",
         "RVersion": "R version 4.3.3 (2024-02-29)",
         "RstoxPackageVersion": [
             "RstoxFramework_4.1.1-9002",
@@ -80,7 +80,7 @@
             "askpass_1.2.0",
             "sys_3.4.2"
         ],
-        "Application": "R version 4.3.3 (2024-02-29)",
+        "Application": "StoX 4.1.0",
         "models": {
             "baseline": [
                 {
@@ -340,7 +340,11 @@
                     },
                     "functionParameters": {
                         "WeightVariable": "IndividualRoundWeight",
-                        "Method": "TotalDomainWeight"
+                        "Method": "TotalDomainWeight",
+                        "StratificationVariables": "Species",
+                        "DomainVariables": [
+
+                        ]
                     },
                     "processParameters": {
                         "enabled": true,
@@ -380,7 +384,11 @@
                     },
                     "functionParameters": {
                         "WeightVariable": "IndividualRoundWeight",
-                        "Method": "TotalDomainWeight"
+                        "Method": "TotalDomainWeight",
+                        "StratificationVariables": "Species",
+                        "DomainVariables": [
+
+                        ]
                     },
                     "processParameters": {
                         "enabled": true,
