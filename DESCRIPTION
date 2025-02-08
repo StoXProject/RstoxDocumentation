@@ -7,11 +7,14 @@ Description: Provides vignettes illustrating integrated use of StoX packages wit
 License: `use_gpl3_license()`
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
-Suggests: 
-    knitr,
-    rmarkdown
+RoxygenNote: 7.3.2
+Depends: R (>= 4.3)
 VignetteBuilder: knitr
 Imports: 
+    RstoxFramework,
+    RstoxData,
     RstoxFDA,
-    survey
+    survey,
+    ggplot2,
+    knitr,
+    rmarkdown
