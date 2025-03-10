@@ -159,8 +159,4 @@ ggplot2::ggplot(resFish) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=
 
 The error of the estimate is much more robust to this kind of sample reduction. The results indicate that one could reduce the number of fish sampled at each haul without risking increasing the error of these two age groups.
 
-```{r saveResults}
-saveRDS(resFish, "samplesize_results_fish_pr_haul.rds")
-saveRDS(resHaul, "samplesize_results_haul.rds")
-```
 

@@ -1,12 +1,12 @@
 {
     "project": {
-        "TimeSaved": "2025-02-02T16:07:14.848Z",
+        "TimeSaved": "2025-03-10T12:43:22.389Z",
         "RVersion": "R version 4.3.3 (2024-02-29)",
         "RstoxPackageVersion": [
             "RstoxFramework_4.1.2-9001",
             "RstoxBase_2.1.2-9002",
             "RstoxData_2.1.2-9001",
-            "RstoxFDA_1.5.0-9003"
+            "RstoxFDA_1.5.0-9004"
         ],
         "CertifiedRstoxPackageVersion": [
             "RstoxFramework_4.1.2-9001",
@@ -214825,49 +214825,18 @@
                     ]
                 },
                 {
-                    "processName": "plotCoverage",
-                    "functionName": "RstoxFDA::PlotSamplingCoverage",
+                    "processName": "ReportMwa",
+                    "functionName": "RstoxFDA::ReportAnalyticalWeightAtAge",
                     "functionInputs": {
-                        "ReportFdaSamplingData": "sampleReport"
+                        "AnalyticalPopulationEstimateData": "RatioEstimate"
                     },
                     "functionParameters": {
-                        "Cumulative": false,
-                        "OtherPercentage": 0,
-                        "ColorScheme": "CellPlot",
-                        "Measurement": "AgeReadings",
-                        "UseDefaultColorSettings": true,
-                        "MinVessels": 2,
-                        "MinCatches": 2,
-                        "MinMeasurements": 100,
-                        "ColorNoSamples": "#ffffcc",
-                        "ColorFewMeasurements": "#c2e699",
-                        "ColorFewCatches": "#78c679",
-                        "ColorFewVessels": "#31a354",
-                        "ColorGoodSampling": "#006837",
-                        "SamplingUnit": [
+                        "PlusGroup": [
 
                         ],
-                        "GradientLowColor": "#ffffcc",
-                        "GradientMidColor": "#c2e699",
-                        "GradientHighColor": "#006837"
-                    },
-                    "processParameters": {
-                        "enabled": true,
-                        "showInMap": false,
-                        "fileOutput": true
-                    },
-                    "processData": [
-
-                    ]
-                },
-                {
-                    "processName": "plotCaa",
-                    "functionName": "RstoxFDA::PlotCatchAtAgeTotals",
-                    "functionInputs": {
-                        "ReportFdaCatchAtAgeData": "ReportCaa"
-                    },
-                    "functionParameters": {
-
+                        "IntervalWidth": 0.9,
+                        "Decimals": 0,
+                        "Unit": "g"
                     },
                     "processParameters": {
                         "enabled": true,
