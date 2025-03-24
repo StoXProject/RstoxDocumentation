@@ -1,0 +1,162 @@
+---
+title: "Analysis of Sample Size Sensitivity"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Analysis of Sample Size Sensitivity}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(RstoxDocumentation)
+```
+
+This is a short introduction to using StoX to investigate if a sampling program tend to over-sample. That is, if data is collected well beyond points of diminishing returns with respect to precision of estimates. For a fruitful analysis, one has to first identify all estimated parameters of interest. There are usually some parameters that are estimated that are of little importance For instance abundance or mean weight of age-groups with very little abundance. If these are not identified up front, and all available computations are produced, one can be almost certain in identifying some parameter that has too low precision. Conversely, all parameters of interest must be checked. Acceptable precision of mean weight, does not imply that one will have acceptable precision abundance, and vice verca. Acceptable precision for big domains (e.g. all fish in an entire fishery), does not at all imply acceptable precision in specific age-groups for specific gears, etc.
+
+The analysis is here exemplified to fisheries sampling with samples from the catch lottery. But the general framework can be adapted to any StoX project that produce estimates and estimates of uncertainty.
+
+## Analysis
+
+The analysis runs a real estimate for real data, but mimics reduced sampling by randomly removing samples. If measures of uncertainty (e.g. CV) is not sensitive to removal of a large number of samples, we should consider if the fishery may be over-sampled.
+
+The function defined below executes a StoX project, but inserts into the execution a function that manipulates the output of a process ('reductionBySelectionProb'). That function will be defined to mimic reduced sampling. It also delegate reporting to a function ('reportFunction') that we must define:
+
+```{r}
+#' Executes stox project with inserted data manipulation routine
+#' @param project
+#' @param dataProcess Name of process in baseline, whose data output should be manipulated by 'reductionFunction'
+#' @param n argument to reductionFunction, the number of samples to remove
+#' @param reductionFunction function that accepts and returns the output from dataProcess, and, and the argument n 
+#' @param reportFunction function that accepts what is returned from RstoxFramework::runProject, and extracts desired results as a data.table
+#' @return the data returned from 'resultProcess'
+runWithReducedData <- function(project, dataProcess, n, reductionFunction=reductionBySelectionProb, reportFunction=report){
+  p <- RstoxFramework::runProject(project, modelNames="baseline", endProcess = dataProcess)
+  data <- p[[dataProcess]]
+  reducedData <- reductionFunction(data, n)
+  
+  replaceDataList <- list()
+  replaceDataList[[dataProcess]] <- reducedData
+
+  
+  result <- RstoxFramework::runProject(project, startProcess = dataProcess, replaceDataList = replaceDataList)
+  return(reportFunction(result))
+}
+```
+
+I will then define the function that mimics reduction in samples. For this example, the easiest way is to manipulate the output of the assignment of PSUs to data, so this function accepts and returns data of type PSUSamplingParametersData. For other kinds of StoX-projects, selection is usuallt not treated separately from recording of data, and the most natural way to implement data reduction would be something similar that accepts and returns StoxBioticData. The following function reduces the sample size by 'n', and keeps data with probability proportional to the selection probabilities.
+
+```{r}
+reductionBySelectionProb <- function(PSUSamplingParametersData, n){
+  
+  N <- nrow(PSUSamplingParametersData$SelectionTable)
+  stopifnot(n<N)
+  keep <- N-n
+  
+  selection <- PSUSamplingParametersData
+  selection$SelectionTable <- selection$SelectionTable[sample.int(nrow(PSUSamplingParametersData$SelectionTable), keep, prob = PSUSamplingParametersData$SelectionTable$SelectionProbability),]
+  selection$SampleTable$n <- keep
+
+  return(selection)  
+}
+```
+
+Finally, the following function extract the results we are interested in from a modified StoX-process run. For this example we will only focus on the abundance of age groups 2, 3, and 6, for illustration purposes only:
+
+```{r}
+report <- function(projectResult){
+  sampleSize <- projectResult[["AssignPSUSamplingParameters"]]
+  result <- projectResult[["ReportCaa"]]$NbyAge
+  result <- result[Age==2 | Age==3 | Age==6,]
+  result$nPSU <- sampleSize$SampleTable$n
+  return(result)
+}
+```
+
+
+Below is an example executing the three functions defined above, and comparing the run with the original data with a run with a random reduction of 10 PSUs (hauls):
+
+```{r}
+exampleProject <- system.file("resources", "analyticalCAA", package = "RstoxDocumentation")
+regularResult <- runWithReducedData(exampleProject, "AssignPSUSamplingParameters", 0, function(x,y){x})
+reducedResult <- runWithReducedData(exampleProject, "AssignPSUSamplingParameters", 10)
+comparison <- merge(regularResult, reducedResult, by=c("AgeGroup", "Age"), suffix=c(".regular", ".reduced"))
+comparison
+```
+
+Check for warnings and messages in the output above, as these will be turned off in the repeated simulation below:
+
+I then define a function that runs this project repeatedly, with varying number of removed samples. It also adds some information to the reported output (number of removed samples, and and identifier for each replicate):
+
+```{r sensitivity, message=FALSE}
+sampleSensitivity <- function(project, dataProcess="AssignPSUSamplingParameters", maxRemove=30, replications=3, reductionFun=reductionBySelectionProb, reportFun=report){
+  
+  result <- NULL
+  
+  computations <- maxRemove*replications
+  for (i in 1:maxRemove){
+    for (j in 1:replications){
+      reducedResult <- runWithReducedData(project, dataProcess, i, reductionFunction = reductionFun, reportFunction = reportFun)
+      reducedResult$sampleReduction <- i
+      reducedResult$replicate <- j
+      
+      result <- rbind(result, reducedResult)
+    }
+  }
+  return(result)
+}
+resHaul<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject)))
+```
+
+Plotting the CV of catch at age estimates does not provide any clear indication of oversampling:
+
+```{r}
+ggplot2::ggplot(resHaul) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,.5)) + ggplot2::ggtitle("Reducing hauls")
+```
+
+### Lower level sampling
+
+It may also be of interest to investigate the consequence of a reduction in sampling intensity at each primary sampling unit. For this sampling program, we could for instance investigate the consequence of reducing the number of fish sampled for age in each haul. We can achieve this by running the same analysis with different functions for mimicking the reduction in sampling and for reporting. In stead of manipulating the StoX project after the assignment of PSUs, we will manipulate it after the filtering of sample records, so we define a function that accepts and returns StoxBiotic-data. The current approach typically samples up to 50 fish for age, sometimes more. We will standardize this and in the resampling we will reduce so that we retain up to 50-n fish:
+
+```{r fishReductionFunction}
+fishReductionEqualProbability <- function(StoxBioticData, n){
+  agedIndividuals <- StoxBioticData$Individual[,list(Aged=sum(!is.na(IndividualAge))), by="HaulKey"]
+  agedIndividuals$max.keep <- 50-n
+  agedIndividuals$keep <- pmin(agedIndividuals$max.keep, agedIndividuals$Aged)
+  
+  inds <- NULL
+  for (h in unique(StoxBioticData$Individual$HaulKey)){
+    sel <- StoxBioticData$Individual$HaulKey == h & !is.na(StoxBioticData$Individual$IndividualAge)
+    allInds <- StoxBioticData$Individual$Individual[sel]
+    selection <- allInds[sample.int(length(allInds), agedIndividuals$keep[agedIndividuals$HaulKey==h])]
+    inds <- rbind(inds, StoxBioticData$Individual[StoxBioticData$Individual$Individual %in% selection])
+  }
+
+  StoxBioticData$Individual <- inds
+  
+  return(StoxBioticData)
+}
+```
+
+The function above simply manipulates the input data by remove fish records. It does not ensure consistency with records on other levels. For instance are fields like sample-weight and total sample-number left untouched. This is not of consequence for this particular analysis, as the downstream methods ComputeIndividualSamplingParameters only relies on the number of specimen-records present and the CatchFractionNumber (The total number of fish in the catch).
+
+I plug this function into the simulation, at the process "RemoveMissingCatchNumber" which is the last of the sample-filtering processes in the StoX-project, and run the simulation.
+
+```{r}
+resFish<-suppressWarnings(suppressMessages(sampleSensitivity(exampleProject, maxRemove = 48, replications = 1, dataProcess="RemoveMissingCatchNumber", reductionFun=fishReductionEqualProbability)))
+```
+I can plot the result the same way as for the haul-reduction analysis.
+
+```{r}
+ggplot2::ggplot(resFish) + ggplot2::geom_line(ggplot2::aes(x=sampleReduction, y=SD/CatchAtAge, col=AgeGroup)) + ggplot2::ylim(c(0,max(resFish$SD/resFish$CatchAtAge))) + ggplot2::ggtitle("Reducing fish / haul")
+```
+
+The error of the estimate is much more robust to this kind of sample reduction. The results indicate that one could reduce the number of fish sampled at each haul without risking increasing the error of these two age groups.
+
+
