@@ -38,9 +38,9 @@ jobs:
           # Install the dependencies:
           # dependencies = TRUE installs "Depends", "Imports", "LinkingTo" and "Suggests", and the  "Depends", "Imports" and "LinkingTo" recursively from those dependencies
           remotes::install_deps(dependencies = TRUE, type = "both")
-          
+
           # Used in "Deploy package" below:
-          install.packages("pkgdown", type = "binary")
+          install.packages("pkgdown", repos = c("https://stoxproject.github.io/repo", getOption("repos")))
         shell: Rscript {0}
 
       - name: Install package
