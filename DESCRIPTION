@@ -1,6 +1,6 @@
 Package: RstoxDocumentation
 Title: Documentation And Verification for StoX packages
-Version: 0.0.0.9000
+Version: 1.0
 Authors@R: 
     person("Edvin", "Fuglebakk", , "Edvin.Fuglebakk@hi.no", role = c("aut", "cre"))
 Description: Provides vignettes illustrating integrated use of StoX packages with other software, and provides correctness checks.
